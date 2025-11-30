@@ -1,3 +1,12 @@
+"""
+Warehouse Environment - Entorno 3
+=================================
+Objetos en posición ALEATORIA (cambian cada episodio)
+Tarea: Pick + Delivery
+
+Diferencia con Entorno 2: random_objects=True
+"""
+
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
@@ -8,24 +17,19 @@ from matplotlib.patches import Rectangle, Circle
 class WarehouseEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 10}
 
-    def __init__(
-        self,
-        just_pick: bool = True,
-        random_objects: bool = False,
-        render_mode: str = None,
-    ):
+    def __init__(self, render_mode: str = None):
         super().__init__()
 
         self.render_mode = render_mode
         self.width = 10.0
         self.height = 10.0
 
-        self.just_pick = just_pick
-        self.random_objects = random_objects
+        # ✅ ENTORNO 3: Objetos aleatorios, con delivery
+        self.just_pick = False
+        self.random_objects = True
 
-        # Define action and observation spaces
-        n_actions = 5 if self.just_pick else 6
-        self.action_space = spaces.Discrete(n_actions)
+        # 6 acciones: Up, Down, Left, Right, Pick, Drop
+        self.action_space = spaces.Discrete(6)
         self.observation_space = spaces.Box(
             low=0, high=10, shape=(11,), dtype=np.float32
         )
@@ -43,9 +47,9 @@ class WarehouseEnv(gym.Env):
         self.agent_velocity = 0.25
         self.pickup_distance = 0.6
 
-        # === RECOMPENSAS DISEÑADAS ===
+        # === RECOMPENSAS ===
         self.r_step = -0.02
-        self.r_collision = -200.0  # ✅ AUMENTADO OTRA VEZ (era -100.0)
+        self.r_collision = -200.0
         self.r_pick = 100.0
         self.r_delivery = 1000.0
         self.r_wrong_drop = -2.0
@@ -53,30 +57,28 @@ class WarehouseEnv(gym.Env):
         self.fig = None
         self.ax = None
 
-        # Para tracking
+        # Para tracking de shaped rewards
         self.previous_distance_to_nearest_object = None
         self.previous_distance_to_delivery = None
 
         self.reset()
 
-    def reset(self, options=None):
-        super().reset()
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
 
         self.agent_pos = self._get_random_empty_position()
 
-        if self.random_objects:
-            self.object_positions = [
-                self._get_random_position_on_shelf(s) for s in self.shelves
-            ]
-        else:
-            self.object_positions = [(2, 3.0), (8, 4.0), (5, 2.0)]
+        # ✅ ENTORNO 3: Objetos en posiciones ALEATORIAS en las estanterías
+        self.object_positions = [
+            self._get_random_position_on_shelf(s) for s in self.shelves
+        ]
 
         self.agent_has_object = False
         self.delivery = False
         self.collision = False
 
         self.steps = 0
-        self.max_steps = 400  # ✅ REDUCIDO (era 1000)
+        self.max_steps = 400
 
         # Reset tracking
         self.previous_distance_to_nearest_object = (
@@ -102,15 +104,14 @@ class WarehouseEnv(gym.Env):
         truncated = False
 
         # --- Action handling ---
-        if action < 4:  # Movement (0: Up, 1: Down, 2: Left, 3: Right)
+        if action < 4:  # Movement
             new_pos = self._get_new_position(action)
 
             if not self._is_collision(new_pos):
                 self.agent_pos = new_pos
 
-                # ✅ SHAPED REWARD CORREGIDO
+                # Shaped reward
                 if not self.agent_has_object:
-                    # Sin objeto: reward ligero por acercarse
                     current_distance = self._get_distance_to_nearest_object()
                     if (
                         current_distance != float("inf")
@@ -120,33 +121,29 @@ class WarehouseEnv(gym.Env):
                     if current_distance != float("inf"):
                         self.previous_distance_to_nearest_object = current_distance
                 else:
-                    # ✅ CON OBJETO: Shaped reward FUERTE para guiar al área
                     delivery_center = (
                         self.delivery_area[0] + self.delivery_area[2] / 2,
                         self.delivery_area[1] + self.delivery_area[3] / 2,
                     )
                     current_distance = self._distance(self.agent_pos, delivery_center)
 
-                    # Reward escalado por proximidad
                     if current_distance < self.previous_distance_to_delivery:
                         if current_distance < 2.0:
-                            reward += 5.0  # MUY cerca
+                            reward += 5.0
                         elif current_distance < 4.0:
-                            reward += 2.0  # Cerca
+                            reward += 2.0
                         elif current_distance < 6.0:
-                            reward += 1.0  # Medio
+                            reward += 1.0
                         else:
-                            reward += 0.3  # Lejos
+                            reward += 0.3
                     else:
-                        reward -= 0.5  # Penalización por alejarse
+                        reward -= 0.5
 
-                    # Gran bonus si está DENTRO del área
                     if self._is_in_area(self.agent_pos, self.delivery_area):
-                        reward += 50.0  # ENORME bonus
+                        reward += 50.0
 
                     self.previous_distance_to_delivery = current_distance
             else:
-                # COLISIÓN
                 self.collision = True
                 terminated = True
                 reward = self.r_collision
@@ -165,7 +162,6 @@ class WarehouseEnv(gym.Env):
                         reward = self.r_pick
                         picked = True
 
-                        # Resetear tracking para la nueva fase
                         delivery_center = (
                             self.delivery_area[0] + self.delivery_area[2] / 2,
                             self.delivery_area[1] + self.delivery_area[3] / 2,
@@ -173,23 +169,18 @@ class WarehouseEnv(gym.Env):
                         self.previous_distance_to_delivery = self._distance(
                             self.agent_pos, delivery_center
                         )
-
-                        if self.just_pick:
-                            terminated = True  # Éxito en Entorno 1
                         break
 
                 if not picked:
                     reward = -2.0
 
-        elif action == 5:  # Drop (solo en Entorno 2 y 3)
+        elif action == 5:  # Drop
             if self.agent_has_object:
                 if self._is_in_area(self.agent_pos, self.delivery_area):
-                    # ✅ ENTREGA EXITOSA
                     reward = self.r_delivery
                     self.delivery = True
                     terminated = True
                 else:
-                    # ✅ ENTREGA FALLIDA: Reward parcial si está cerca
                     delivery_center = (
                         self.delivery_area[0] + self.delivery_area[2] / 2,
                         self.delivery_area[1] + self.delivery_area[3] / 2,
@@ -197,9 +188,9 @@ class WarehouseEnv(gym.Env):
                     distance = self._distance(self.agent_pos, delivery_center)
 
                     if distance < 1.5:
-                        reward = 100.0  # Muy cerca
+                        reward = 100.0
                     elif distance < 3.0:
-                        reward = 30.0  # Cerca
+                        reward = 30.0
                     else:
                         reward = self.r_wrong_drop
 
@@ -215,7 +206,6 @@ class WarehouseEnv(gym.Env):
             truncated = True
             reward += -10.0
 
-        # --- Prepare outputs ---
         obs = self._get_obs()
         info = {
             "has_object": self.agent_has_object,
@@ -227,7 +217,6 @@ class WarehouseEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _get_distance_to_nearest_object(self):
-        """Distancia al objeto más cercano disponible"""
         distances = []
         for obj_pos in self.object_positions:
             if obj_pos is not None:
@@ -238,7 +227,6 @@ class WarehouseEnv(gym.Env):
         obs = np.zeros(11, dtype=np.float32)
         obs[0:2] = self.agent_pos
 
-        # Objetos (si no existen, poner fuera del mapa)
         for i in range(3):
             if i < len(self.object_positions) and self.object_positions[i] is not None:
                 obs[2 + 2 * i : 4 + 2 * i] = self.object_positions[i]
@@ -263,7 +251,6 @@ class WarehouseEnv(gym.Env):
         return (x, y)
 
     def _is_collision(self, pos):
-        # Check walls
         if (
             pos[0] <= self.agent_radius
             or pos[0] >= self.width - self.agent_radius
@@ -272,7 +259,6 @@ class WarehouseEnv(gym.Env):
         ):
             return True
 
-        # Check shelves
         for shelf in self.shelves:
             if self._is_in_area(pos, shelf, self.agent_radius):
                 return True
@@ -289,6 +275,7 @@ class WarehouseEnv(gym.Env):
                 return pos
 
     def _get_random_position_on_shelf(self, shelf):
+        """Genera posición aleatoria en una estantería"""
         aux = np.random.uniform(0, 1)
         x = shelf[0] + (0.25 if aux < 0.5 else 0.75) * shelf[2]
         y = np.random.uniform(shelf[1] + 0.5, shelf[1] + shelf[3] - 0.5)
@@ -318,7 +305,6 @@ class WarehouseEnv(gym.Env):
         self.ax.set_ylim(0, self.height)
         self.ax.set_aspect("equal")
 
-        # Shelves
         for s in self.shelves:
             self.ax.add_patch(
                 Rectangle(
@@ -332,7 +318,6 @@ class WarehouseEnv(gym.Env):
                 )
             )
 
-        # Delivery area
         self.ax.add_patch(
             Rectangle(
                 self.delivery_area[:2],
@@ -346,20 +331,18 @@ class WarehouseEnv(gym.Env):
             )
         )
 
-        # Objects
         for obj in self.object_positions:
             if obj is not None:
                 self.ax.add_patch(Circle(obj, radius=0.2, color="blue"))
 
-        # Agent
         color = "red" if self.agent_has_object else "orange"
         self.ax.add_patch(
             Circle(self.agent_pos, radius=self.agent_radius, color=color, zorder=10)
         )
 
-        title = f"Steps: {self.steps}"
+        title = f"Entorno 3 | Steps: {self.steps}"
         if self.agent_has_object:
-            title += " | Carrying object 📦"
+            title += " | 📦"
         plt.title(title)
         plt.draw()
         plt.pause(0.01)
@@ -377,15 +360,15 @@ class WarehouseEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    print("=== Testing Entorno 1 (just_pick=True) ===")
-    env = WarehouseEnv(just_pick=True, random_objects=False, render_mode="human")
-    obs, info = env.reset()
+    print("=== Testing Entorno 3 (random_objects=True) ===")
+    env = WarehouseEnv(render_mode="human")
 
-    for episode in range(2):
+    for episode in range(3):
         obs, info = env.reset()
-        total_reward = 0
         print(f"\n--- Episode {episode+1} ---")
+        print(f"Object positions: {env.object_positions}")
 
+        total_reward = 0
         for step in range(100):
             action = env.action_space.sample()
             obs, reward, terminated, truncated, info = env.step(action)
@@ -393,11 +376,11 @@ if __name__ == "__main__":
             env.render()
 
             if terminated or truncated:
-                print(f"Finished: Total reward: {total_reward:.2f}, Steps: {step+1}")
-                if info["has_object"]:
-                    print("✅ Success: Object picked!")
+                print(f"Finished: reward={total_reward:.2f}, steps={step+1}")
+                if info["delivery"]:
+                    print("✅ Delivery!")
                 elif info["collision"]:
-                    print("❌ Failed: Collision")
+                    print("❌ Collision")
                 break
 
     env.close()

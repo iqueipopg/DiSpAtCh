@@ -568,6 +568,16 @@ class DQNAgent:
         self.episodes_trained = checkpoint.get("episodes_trained", 0)
         print(f"✅ Modelo cargado: {filename}")
 
+    def load(self, filename):
+        """Carga el modelo."""
+        checkpoint = torch.load(filename, map_location=self.device)
+        self.q_network.load_state_dict(checkpoint["q_network"])
+        self.target_network.load_state_dict(checkpoint["target_network"])
+        self.optimizer.load_state_dict(checkpoint["optimizer"])
+        self.total_steps = checkpoint.get("total_steps", 0)
+        self.episodes_trained = checkpoint.get("episodes_trained", 0)
+        print(f"✅ Modelo cargado: {filename}")
+
 
 # =============================================================================
 # FUNCIÓN DE ENTRENAMIENTO
@@ -615,7 +625,7 @@ def train_environment(env_name, just_pick, random_objects, num_episodes=2000):
     elif env_name == "Entorno_2":
         config = {
             "lr": 5e-5,
-            "epsilon_decay_steps": 60000,
+            "epsilon_decay_steps": 300000,
             "target_update": 1000,
             "num_episodes": 6000,
         }
