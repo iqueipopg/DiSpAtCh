@@ -1,0 +1,17 @@
+# Ignorar entorno virtual
+rl_warehouse_gpu/
+rl_wharehouse_gpu/
+venv/
+.env/
+
+# Ignorar bytecode de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar ficheros temporales de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
