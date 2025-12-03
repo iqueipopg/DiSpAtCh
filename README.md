@@ -1,3 +1,5 @@
+![DiSpAtCh Banner](images/Banner.png)
+
 # DiSpAtCh 🤖📦
 
 **DiSpAtCh** (*Deep Intelligent Spatial Agent for Task CHaining*) is a Deep Reinforcement Learning system that trains an autonomous agent to navigate a warehouse environment, pick up objects from shelves, and deliver them to a designated area.
