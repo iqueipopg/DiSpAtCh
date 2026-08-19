@@ -4,7 +4,7 @@
 
 **DiSpAtCh** (Deep Intelligent Spatial Agent for Task CHaining) is a deep reinforcement learning system that trains an autonomous agent to navigate a warehouse, pick up objects from shelves, and deliver them to a designated area. The agent is a Double DQN implemented in PyTorch, trained across three environments of increasing difficulty with transfer learning between them.
 
-Developed for the Reinforcement Learning course at Universidad Pontificia Comillas (ICAI), Engineering Mathematics (iMAT) program.
+Developed for the Reinforcement Learning course at Universidad Pontificia Comillas (ICAI), Mathematical Engineering and Artificial Intelligence (iMAT) program.
 
 ---
 
@@ -69,7 +69,7 @@ Prerequisites: Python 3.8+, PyTorch (CUDA recommended), Gymnasium.
 git clone https://github.com/iqueipopg/DiSpAtCh.git
 cd DiSpAtCh
 python -m venv venv
-source venv/bin/activate      # Windows: .\venv\Scripts\activate
+source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
